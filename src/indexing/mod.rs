@@ -1,3 +1,12 @@
+// ! High-level indexing utilities for the repository. This module parses source files into
+// ! semantic CodeChunk values and produces human-readable summaries used by the planner and
+// ! retrieval layers (file, symbol, module and folder summaries).
+// !
+// ! Key exports include the CodeChunk and SymbolKind types (from the chunker submodule),
+// ! the FileSummary, SymbolSummary, ModuleSummary and FolderSummary structs, and primary
+// ! functions such as index_repo / index_repo_async, build_planning_summary,
+// ! build_file_summaries, build_symbol_summaries and build_module_summaries.
+// ! See the parser, chunker and walker submodules for parsing, chunk extraction and file discovery.
 pub mod chunker;
 pub mod manifest;
 pub mod parser;

@@ -113,6 +113,45 @@ fn parses_begin_patch_add_file_without_hunk_header() {
 }
 
 #[test]
+fn begin_patch_update_with_plain_context_applies_successfully() {
+    let tmp = tempdir().expect("tempdir");
+    let repo = tmp.path();
+
+    run(repo, "git init");
+    run(repo, "git config user.email test@example.com");
+    run(repo, "git config user.name Tester");
+
+    fs::create_dir_all(repo.join("src/indexing")).expect("create nested dir");
+    fs::write(
+        repo.join("src/indexing/mod.rs"),
+        "pub fn build_module_summaries() -> Vec<String> {\n    let mut out = vec![];\n    out.push(\"ok\".to_string());\n    out\n}\n",
+    )
+    .expect("write baseline file");
+    run(repo, "git add src/indexing/mod.rs");
+    run(repo, "git commit -m init --quiet");
+
+    let begin_patch = r#"*** Begin Patch
+*** Update File: src/indexing/mod.rs
+@@
+ pub fn build_module_summaries() -> Vec<String> {
+     let mut out = vec![];
++    // inserted doc hint
+     out.push("ok".to_string());
+     out
+ }
+*** End Patch
+"#;
+
+    let patches = parse_unified_diff(begin_patch).expect("begin patch should parse");
+    assert_eq!(patches.len(), 1);
+
+    apply_patch(repo, &patches[0].diff).expect("converted patch should apply");
+
+    let updated = fs::read_to_string(repo.join("src/indexing/mod.rs")).expect("read updated");
+    assert!(updated.contains("// inserted doc hint"));
+}
+
+#[test]
 fn apply_and_revert_patch_in_temp_repo() {
     let tmp = tempdir().expect("tempdir");
     let repo = tmp.path();

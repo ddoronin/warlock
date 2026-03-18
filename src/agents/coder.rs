@@ -288,7 +288,7 @@ fn convert_begin_patch_to_unified_diff(raw: &str) -> Option<String> {
             _ => return,
         };
 
-        let normalized_body = ensure_hunks_for_begin_patch_body(body);
+        let normalized_body = ensure_hunks_for_begin_patch_body(op, body);
 
         let mut block = String::new();
         block.push_str(&format!("diff --git a/{file} b/{file}\n"));
@@ -386,27 +386,53 @@ fn convert_begin_patch_to_unified_diff(raw: &str) -> Option<String> {
     }
 }
 
-fn ensure_hunks_for_begin_patch_body(body: &[String]) -> Vec<String> {
-    if body.iter().any(|line| is_valid_hunk_header(line)) {
-        return body.to_vec();
-    }
+fn ensure_hunks_for_begin_patch_body(op: BeginPatchOp, body: &[String]) -> Vec<String> {
+    let has_valid_headers = body.iter().any(|line| is_valid_hunk_header(line));
 
-    let mut changed_lines = Vec::new();
-    for line in body {
+    let normalize_line = |line: &str| -> Option<String> {
+        if line.starts_with("@@") {
+            if is_valid_hunk_header(line) {
+                return Some(line.to_string());
+            }
+            // Section hints like "@@ fn foo" are not valid unified headers.
+            return None;
+        }
+
         if line.starts_with('+') || line.starts_with('-') || line.starts_with(' ') {
-            changed_lines.push(line.clone());
+            return Some(line.to_string());
+        }
+
+        let prefixed = match op {
+            BeginPatchOp::Add => format!("+{line}"),
+            BeginPatchOp::Delete => format!("-{line}"),
+            BeginPatchOp::Update => format!(" {line}"),
+        };
+        Some(prefixed)
+    };
+
+    let mut normalized = Vec::new();
+    for line in body {
+        if let Some(line) = normalize_line(line) {
+            normalized.push(line);
         }
     }
 
-    if changed_lines.is_empty() {
-        return body.to_vec();
+    if has_valid_headers {
+        return normalized;
     }
 
-    let old_count = changed_lines
+    let has_changes = normalized
+        .iter()
+        .any(|line| line.starts_with('+') || line.starts_with('-'));
+    if !has_changes {
+        return normalized;
+    }
+
+    let old_count = normalized
         .iter()
         .filter(|line| !line.starts_with('+'))
         .count();
-    let new_count = changed_lines
+    let new_count = normalized
         .iter()
         .filter(|line| !line.starts_with('-'))
         .count();
@@ -414,12 +440,12 @@ fn ensure_hunks_for_begin_patch_body(body: &[String]) -> Vec<String> {
     let old_start = if old_count == 0 { 0 } else { 1 };
     let new_start = if new_count == 0 { 0 } else { 1 };
 
-    let mut with_hunk = Vec::with_capacity(changed_lines.len() + 1);
+    let mut with_hunk = Vec::with_capacity(normalized.len() + 1);
     with_hunk.push(format!(
         "@@ -{},{} +{},{} @@",
         old_start, old_count, new_start, new_count
     ));
-    with_hunk.extend(changed_lines);
+    with_hunk.extend(normalized);
     with_hunk
 }
 
@@ -504,9 +530,15 @@ fn parse_diff_block(block: &str) -> Result<CodePatch> {
     }
 
     let file = file.ok_or_else(|| anyhow::anyhow!("diff block missing +++ path"))?;
+    let diff = if block.ends_with('\n') {
+        block.to_string()
+    } else {
+        format!("{block}\n")
+    };
+
     Ok(CodePatch {
         file,
-        diff: block.to_string(),
+        diff,
         is_new_file,
     })
 }

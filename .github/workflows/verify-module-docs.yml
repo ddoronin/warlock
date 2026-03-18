@@ -1,0 +1,39 @@
+name: Verify module docs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  verify-module-docs:
+    name: Verify module docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build workspace
+        run: cargo build --workspace --locked
+
+      - name: Run module docs verification
+        # This invokes the repository's module docs verifier. The command below
+        # assumes the verifier is available as a binary named `verify_module_docs`
+        # in this workspace. If your repo places the verifier elsewhere, adjust
+        # the command accordingly.
+        run: cargo run --bin verify_module_docs --quiet
+
