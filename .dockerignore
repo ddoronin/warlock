@@ -1,0 +1,6 @@
+.git
+target
+.warlock
+node_modules
+.DS_Store
+*.log

@@ -1,0 +1,44 @@
+[llm]
+provider = "openai"
+model = "gpt-5-mini"
+temperature = 0.1
+max_tokens = 4096
+
+[embeddings]
+provider = "openai"
+model = "text-embedding-3-small"
+dimensions = 1536
+batch_size = 128
+max_concurrency = 4
+persist_cache = true
+cache_db_path = ".warlock/embeddings_cache"
+
+[vector_store]
+provider = "qdrant"
+url = "http://localhost:6333"
+collection = "code_chunks"
+top_k = 12
+
+[sandbox]
+backend = "local"
+provider = "docker"
+image = "rust:1.85"
+timeout_secs = 600
+cpu_limit = 2
+memory_limit_mb = 2048
+network_enabled = false
+
+[agent]
+max_reflection_attempts = 3
+planner_max_steps = 20
+coder_context_chunks = 12
+max_plan_cycles = 2
+planning_experiments_enabled = true
+planning_experiment_strict = true
+
+[indexing]
+max_file_size_kb = 1024
+max_chunk_lines = 200
+parallel_file_workers = 8
+ignore_patterns = ["**/target/**", "**/.git/**", "**/node_modules/**", "**/dist/**"]
+supported_languages = ["rust", "python", "typescript", "tsx"]
